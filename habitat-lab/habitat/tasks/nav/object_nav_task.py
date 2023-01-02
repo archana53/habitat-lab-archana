@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, List, Optional
 
 import attr
 import numpy as np
+import pickle
 from gym import spaces
 
 from habitat.core.logging import logger
@@ -142,7 +143,10 @@ class ObjectGoalSensor(Sensor):
             )
 
         return spaces.Box(
-            low=0, high=max_value, shape=sensor_shape, dtype=np.int64
+            low=np.finfo(np.float32).min,
+            high=np.finfo(np.float32).max,
+            dtype=np.float32,
+            shape = sensor_shape
         )
 
     def get_observation(
@@ -176,6 +180,84 @@ class ObjectGoalSensor(Sensor):
         else:
             raise RuntimeError(
                 "Wrong goal_spec specified for ObjectGoalSensor."
+            )
+
+@registry.register_sensor(name = "objectgoalprompt_sensor")
+class ObjectGoalPromptSensor(Sensor):
+    """A sensor for Object Goal Prompt specification as observations which is used in
+    ObjectGoal Navigation. The goal is expected to be specified by object_id or
+    semantic category id.
+    For the agent in simulator the forward direction is along negative-z.
+    In polar coordinate format the angle returned is azimuth to the goal.
+    Args:
+        sim: a reference to the simulator for calculating task observations.
+        config: a config for the ObjectGoalSensor sensor. Can contain field
+            goal_spec that specifies which id use for goal specification,
+            goal_spec_max_val the maximum object_id possible used for
+            observation space definition.
+        dataset: a Object Goal navigation dataset that contains dictionaries
+        of categories id to text mapping.
+    """
+    cls_uuid: str = "objectgoalprompt"
+
+    def __init__(
+        self,
+        sim,
+        config: "DictConfig",
+        dataset: "ObjectNavDatasetV1",
+        *args: Any,
+        **kwargs: Any,
+    ):
+        self._sim = sim
+        #import mapping dictionary file stored on disk
+        with open('mapping.pkl', 'rb') as handle:
+            mapping = pickle.load(handle)
+        self._mapping = mapping
+        self._dataset = dataset
+        super().__init__(config=config)
+
+    def _get_uuid(self, *args: Any, **kwargs: Any) -> str:
+        return self.cls_uuid
+
+    def _get_sensor_type(self, *args: Any, **kwargs: Any):
+        return SensorTypes.SEMANTIC
+
+    def _get_observation_space(self, *args: Any, **kwargs: Any):
+        sensor_shape = (512,)
+        return spaces.Box(
+            low=np.finfo(np.float32).min, high=np.finfo(np.float32).max, shape=sensor_shape, dtype=np.float32
+        )
+    def get_observation(
+        self,
+        observations,
+        *args: Any,
+        episode: ObjectGoalNavEpisode,
+        **kwargs: Any,
+    ) -> Optional[np.ndarray]:
+
+        if len(episode.goals) == 0:
+            logger.error(
+                f"No goal specified for episode {episode.episode_id}."
+            )
+            return None
+        if not isinstance(episode.goals[0], ObjectGoal):
+            logger.error(
+                f"First goal should be ObjectGoal, episode {episode.episode_id}."
+            )
+            return None
+        category_name = episode.object_category
+        if self.config.goal_spec == "TASK_CATEGORY_ID":
+            return np.array(
+                [self._mapping[self._dataset.category_to_task_category_id[category_name]]],
+                dtype=np.float32,
+            ).squeeze()
+        elif self.config.goal_spec == "OBJECT_ID":
+            obj_goal = episode.goals[0]
+            assert isinstance(obj_goal, ObjectGoal)  # for type checking
+            return np.array([self._mapping[obj_goal.object_name_id]], dtype=np.float32).squeeze()
+        else:
+            raise RuntimeError(
+                "Wrong goal_spec specified for ObjectGoalPromptSensor."
             )
 
 

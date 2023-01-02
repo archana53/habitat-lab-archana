@@ -743,7 +743,7 @@ class PPOTrainer(BaseRLTrainer):
         Returns:
             None
         """
-
+        print(self.config)
         resume_state = load_resume_state(self.config)
         self._init_train(resume_state)
 

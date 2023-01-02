@@ -24,7 +24,7 @@ from habitat.tasks.nav.nav import (
     PointGoalSensor,
     ProximitySensor,
 )
-from habitat.tasks.nav.object_nav_task import ObjectGoalSensor
+from habitat.tasks.nav.object_nav_task import ObjectGoalSensor, ObjectGoalPromptSensor
 from habitat_baselines.common.baseline_registry import baseline_registry
 from habitat_baselines.rl.ddppo.policy import resnet
 from habitat_baselines.rl.ddppo.policy.running_mean_and_var import (
@@ -283,6 +283,7 @@ class PointNavResNetNet(Net):
             goal_sensor_keys = {
                 IntegratedPointGoalGPSAndCompassSensor.cls_uuid,
                 ObjectGoalSensor.cls_uuid,
+                ObjectGoalPromptSensor.cls_uuid,
                 EpisodicGPSSensor.cls_uuid,
                 PointGoalSensor.cls_uuid,
                 HeadingSensor.cls_uuid,
@@ -295,6 +296,7 @@ class PointNavResNetNet(Net):
         self._fuse_keys_1d: List[str] = [
             k for k in fuse_keys if len(observation_space.spaces[k].shape) == 1
         ]
+        print(self._fuse_keys_1d)
         if len(self._fuse_keys_1d) != 0:
             rnn_input_size += sum(
                 observation_space.spaces[k].shape[0]
@@ -325,6 +327,10 @@ class PointNavResNetNet(Net):
                 self._n_object_categories, 32
             )
             rnn_input_size += 32
+
+        if ObjectGoalPromptSensor.cls_uuid in observation_space.spaces:
+            print("using our sensor")
+            rnn_input_size += 512
 
         if EpisodicGPSSensor.cls_uuid in observation_space.spaces:
             input_gps_dim = observation_space.spaces[
@@ -538,6 +544,10 @@ class PointNavResNetNet(Net):
         if ObjectGoalSensor.cls_uuid in observations:
             object_goal = observations[ObjectGoalSensor.cls_uuid].long()
             x.append(self.obj_categories_embedding(object_goal).squeeze(dim=1))
+
+        if ObjectGoalPromptSensor.cls_uuid in observations:
+            object_goal = observations[ObjectGoalPromptSensor.cls_uuid].float()
+            x.append((object_goal).squeeze(dim =1 ))
 
         if EpisodicCompassSensor.cls_uuid in observations:
             compass_observations = torch.stack(
