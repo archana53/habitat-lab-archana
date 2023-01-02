@@ -10,7 +10,10 @@ from typing import TYPE_CHECKING, Any, List, Optional, Sequence, Tuple, Union
 
 import attr
 import numpy as np
+import torch
+import clip
 import quaternion
+import pickle
 from gym import spaces
 
 from habitat.config.default import get_agent_config
@@ -98,6 +101,7 @@ class NavigationEpisode(Episode):
         goals: list of goals specifications
         start_room: room id
         shortest_paths: list containing shortest paths to goals
+        caption_goal
     """
 
     goals: List[NavigationGoal] = attr.ib(
@@ -107,6 +111,7 @@ class NavigationEpisode(Episode):
     )
     start_room: Optional[str] = None
     shortest_paths: Optional[List[List[ShortestPathPoint]]] = None
+    caption_goal : Optional[str] = None
 
 
 @registry.register_sensor
@@ -287,6 +292,56 @@ class ImageGoalSensor(Sensor):
         self._current_episode_id = episode_uniq_id
 
         return self._current_image_goal
+
+@registry.register_sensor(name = "captiongoal_sensor")
+class CaptionGoalSensor(Sensor):
+    r"""Sensor for CaptionGoal observations which are used in CaptionGoal Navigation.
+
+    Args:
+        sim: reference to the simulator for calculating task observations.
+        config: config for the ImageGoal sensor.
+    """
+    cls_uuid: str = "captiongoal"
+
+    def __init__(
+        self, *args: Any, sim: Simulator, config: "DictConfig", **kwargs: Any
+    ):
+        self._sim = sim
+        self._current_episode_id: Optional[str] = None
+        self._current_caption_goal_encoding = None
+        with open('gc_embedding_dict.pkl', 'rb') as handle:
+            mapping = pickle.load(handle)
+        self._mapping = mapping
+        super().__init__(config=config)
+
+    def _get_uuid(self, *args: Any, **kwargs: Any) -> str:
+        return self.cls_uuid
+
+    def _get_sensor_type(self, *args: Any, **kwargs: Any):
+        return SensorTypes.TENSOR
+
+    def _get_observation_space(self, *args: Any, **kwargs: Any):
+        return spaces.Box(
+            low=np.finfo(np.float32).min, high=np.finfo(np.float32).max, shape=(512,), dtype=np.float32
+        )
+
+    def _get_pointnav_episode_caption_goal(self, episode: NavigationEpisode):
+        #Return the goal caption for the current episode
+        goal_caption = episode.caption_goal
+        return goal_caption
+
+    def get_observation(
+        self,
+        *args: Any,
+        observations,
+        episode: NavigationEpisode,
+        **kwargs: Any,
+    ):
+
+        caption_goal = self._get_pointnav_episode_caption_goal(
+            episode
+        )
+        return self._mapping[caption_goal]
 
 
 @registry.register_sensor(name="PointGoalWithGPSCompassSensor")

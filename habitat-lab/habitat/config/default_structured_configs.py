@@ -183,10 +183,19 @@ class ObjectGoalSensorConfig(LabSensorConfig):
     goal_spec: str = "TASK_CATEGORY_ID"
     goal_spec_max_val: int = 50
 
+@dataclass
+class ObjectGoalPromptSensorConfig(LabSensorConfig):
+    type: str = "objectgoalprompt_sensor"
+    goal_spec: str = "TASK_CATEGORY_ID"
+    goal_spec_max_val: int = 50
 
 @dataclass
 class ImageGoalSensorConfig(LabSensorConfig):
     type: str = "ImageGoalSensor"
+
+@dataclass
+class CaptionGoalSensorConfig(LabSensorConfig):
+    type: str = "captiongoal_sensor"
 
 
 @dataclass
@@ -1296,10 +1305,22 @@ cs.store(
     node=ObjectGoalSensorConfig,
 )
 cs.store(
+    package="habitat.task.lab_sensors.objectgoalprompt_sensor",
+    group="habitat/task/lab_sensors",
+    name="objectgoalprompt_sensor",
+    node=ObjectGoalPromptSensorConfig,
+)
+cs.store(
     package="habitat.task.lab_sensors.imagegoal_sensor",
     group="habitat/task/lab_sensors",
     name="imagegoal_sensor",
     node=ImageGoalSensorConfig,
+)
+cs.store(
+    package="habitat.task.lab_sensors.captiongoal_sensor",
+    group="habitat/task/lab_sensors",
+    name="captiongoal_sensor",
+    node=CaptionGoalSensorConfig,
 )
 cs.store(
     package="habitat.task.lab_sensors.instance_imagegoal_sensor",
